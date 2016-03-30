@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Andriod Note</title>
+  <subtitle>人山人海，边走边看</subtitle>
+  <link href="/atom.xml" rel="self"/>
+  
+  <link href="http://mayubao.github.io/"/>
+  <updated>2016-03-30T06:50:42.566Z</updated>
+  <id>http://mayubao.github.io/</id>
+  
+  <author>
+    <name>mayubao</name>
+    
+  </author>
+  
+  <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>Looper线程的创建以及 Handler、Message、MessageQueue、Looper的关系</title>
+    <link href="http://mayubao.github.io/2016/03/30/how-to-create-loop-thread/"/>
+    <id>http://mayubao.github.io/2016/03/30/how-to-create-loop-thread/</id>
+    <published>2016-03-30T05:34:38.000Z</published>
+    <updated>2016-03-30T06:50:42.566Z</updated>
+    
+    <content type="html">&lt;h2 id=&quot;前言&quot;&gt;&lt;a href=&quot;#前言&quot; class=&quot;headerlink&quot; title=&quot;前言&quot;&gt;&lt;/a&gt;前言&lt;/h2&gt;&lt;p&gt;在Android的实际开发当中，刚开始很多时候都是用Handler、Message来实现异步的。&lt;br&gt;Handler、Message、MessageQueue、Loop内部是怎么实现这种通信方式的？我们都是一知半解。所以自己亲手溜溜了文档。做了一下笔记。&lt;br&gt;直接跟踪源码到Looper的源码中看到这一段。直接从这里入手！！！&lt;/p&gt;
+&lt;h2 id=&quot;Looper线程的典型实现&quot;&gt;&lt;a href=&quot;#Looper线程的典型实现&quot; class=&quot;headerlink&quot; title=&quot;Looper线程的典型实现&quot;&gt;&lt;/a&gt;Looper线程的典型实现&lt;/h2&gt;&lt;p&gt;文档片段：（Looper.java）&lt;/p&gt;
+&lt;figure class=&quot;highlight java&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;span class=&quot;line&quot;&gt;1&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;2&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;3&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;4&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;5&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;6&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;7&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;8&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;9&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;10&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;11&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;12&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;13&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;14&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;15&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;16&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;17&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;18&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;19&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;20&lt;/span&gt;&lt;br&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;span class=&quot;line&quot;&gt;&lt;span class=&quot;comment&quot;&gt;/*&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;This is a typical example of the implementation of a Looper thread,&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;using the separation of &amp;#123;@link #prepare&amp;#125; and &amp;#123;@link #loop&amp;#125; to create an&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;initial Handler to communicate with the Looper.&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;*/&lt;/span&gt;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;&lt;span class=&quot;class&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;title&quot;&gt;LooperThread&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;extends&lt;/span&gt; &lt;span class=&quot;title&quot;&gt;Thread&lt;/span&gt; &lt;/span&gt;&amp;#123;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;public&lt;/span&gt; Handler mHandler;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;      &lt;span class=&quot;function&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;title&quot;&gt;run&lt;/span&gt;&lt;span class=&quot;params&quot;&gt;()&lt;/span&gt; &lt;/span&gt;&amp;#123;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;          Looper.prepare();&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;          mHandler = &lt;span class=&quot;keyword&quot;&gt;new&lt;/span&gt; Handler() &amp;#123;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;              &lt;span class=&quot;function&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;title&quot;&gt;handleMessage&lt;/span&gt;&lt;span class=&quot;params&quot;&gt;(Message msg)&lt;/span&gt; &lt;/span&gt;&amp;#123;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;                  &lt;span class=&quot;comment&quot;&gt;// process incoming messages here&lt;/span&gt;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;              &amp;#125;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;          &amp;#125;;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;          Looper.loop();&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;      &amp;#125;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;  &amp;#125;&lt;/span&gt;&lt;br&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;
+&lt;p&gt;&lt;img src=&quot;http://mayubao.github.io/images/looper_thread.png&quot; alt=&quot;looper-thread&quot;&gt;&lt;/p&gt;
+&lt;p&gt;实现Looper线程的步骤：&lt;/p&gt;
+&lt;h3 id=&quot;1-Looper-prepare&quot;&gt;&lt;a href=&quot;#1-Looper-prepare&quot; class=&quot;headerlink&quot; title=&quot;1.Looper.prepare&quot;&gt;&lt;/a&gt;1.Looper.prepare&lt;/h3&gt;&lt;p&gt;初始化当前的线程作为looper线程，如果现在创建一个handler就会关联到这个looper。显然，如果我们如果要在一个子线程中关联一个looper的，就必须在子线程中调用 Looper.prepare()&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;java&quot;&gt; &lt;span class=&quot;comment&quot;&gt;/** Initialize the current thread as a looper.
+  * This gives you a chance to create handlers that then reference
+  * this looper, before actually starting the loop. Be sure to call
+  * {&lt;span class=&quot;doctag&quot;&gt;@link&lt;/span&gt; #loop()} after calling this method, and end it by calling
+  * {&lt;span class=&quot;doctag&quot;&gt;@link&lt;/span&gt; #quit()}.
+  */&lt;/span&gt;
+&lt;span class=&quot;function&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;static&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;title&quot;&gt;prepare&lt;/span&gt;&lt;span class=&quot;params&quot;&gt;()&lt;/span&gt; &lt;/span&gt;{
+    prepare(&lt;span class=&quot;keyword&quot;&gt;true&lt;/span&gt;);
+}
+
+&lt;span class=&quot;function&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;static&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;title&quot;&gt;prepare&lt;/span&gt;&lt;span class=&quot;params&quot;&gt;(&lt;span class=&quot;keyword&quot;&gt;boolean&lt;/span&gt; quitAllowed)&lt;/span&gt; &lt;/span&gt;{
+    &lt;span class=&quot;keyword&quot;&gt;if&lt;/span&gt; (sThreadLocal.get() != &lt;span class=&quot;keyword&quot;&gt;null&lt;/span&gt;) {
+        &lt;span class=&quot;keyword&quot;&gt;throw&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;new&lt;/span&gt; RuntimeException(&lt;span class=&quot;string&quot;&gt;&quot;Only one Looper may be created per thread&quot;&lt;/span&gt;);
+    }
+    sThreadLocal.set(&lt;span class=&quot;keyword&quot;&gt;new&lt;/span&gt; Looper(quitAllowed));
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;如果在子线程中 Looper.prepare()最终会初始化一个Looper;&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;java&quot;&gt;&lt;span class=&quot;function&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;title&quot;&gt;Looper&lt;/span&gt;&lt;span class=&quot;params&quot;&gt;(&lt;span class=&quot;keyword&quot;&gt;boolean&lt;/span&gt; quitAllowed)&lt;/span&gt; &lt;/span&gt;{
+    mQueue = &lt;span class=&quot;keyword&quot;&gt;new&lt;/span&gt; MessageQueue(quitAllowed);
+    mThread = Thread.currentThread();
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;最终Looper线程会持有成员变量 mQueue的消息队列MessageQueue 和 mThread的当前线程Thread。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;总结：当在子线程中Looper.prepare时候 其实就是创建了一个Looper对象，然后绑定到对应的子线程中去。而且Looper创建的时候也初始化了一个消息队列MessageQueue作为自己的成员变量。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h3 id=&quot;2-mHandler-new-Handler&quot;&gt;&lt;a href=&quot;#2-mHandler-new-Handler&quot; class=&quot;headerlink&quot; title=&quot;2.mHandler = new Handler()&quot;&gt;&lt;/a&gt;2.mHandler = new Handler()&lt;/h3&gt;&lt;pre&gt;&lt;code class=&quot;java&quot;&gt;&lt;span class=&quot;comment&quot;&gt;/**
+ * Default constructor associates this handler with the {&lt;span class=&quot;doctag&quot;&gt;@link&lt;/span&gt; Looper} for the
+ * current thread.
+ *
+ * If this thread does not have a looper, this handler won&#39;t be able to receive messages
+ * so an exception is thrown.
+ */&lt;/span&gt;
+&lt;span class=&quot;function&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;title&quot;&gt;Handler&lt;/span&gt;&lt;span class=&quot;params&quot;&gt;()&lt;/span&gt; &lt;/span&gt;{
+    &lt;span class=&quot;keyword&quot;&gt;this&lt;/span&gt;(&lt;span class=&quot;keyword&quot;&gt;null&lt;/span&gt;, &lt;span class=&quot;keyword&quot;&gt;false&lt;/span&gt;);&lt;span class=&quot;comment&quot;&gt;//调用了当前另外的两个参数的Handler构造函数&lt;/span&gt;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;默认的构造方法创建了一个关联当前线程looper的handler.如果这个线程没有关联looper对象，这个handler不能接收到消息，会导致Exception。&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;java&quot;&gt;&lt;span class=&quot;comment&quot;&gt;/**
+ * Use the {&lt;span class=&quot;doctag&quot;&gt;@link&lt;/span&gt; Looper} for the current thread with the specified callback interface
+ * and set whether the handler should be asynchronous.
+ *
+ * Handlers are synchronous by default unless this constructor is used to make
+ * one that is strictly asynchronous.
+ *
+ * Asynchronous messages represent interrupts or events that do not require global ordering
+ * with respect to synchronous messages.  Asynchronous messages are not subject to
+ * the synchronization barriers introduced by {&lt;span class=&quot;doctag&quot;&gt;@link&lt;/span&gt; MessageQueue#enqueueSyncBarrier(long)}.
+ *
+ * &lt;span class=&quot;doctag&quot;&gt;@param&lt;/span&gt; callback The callback interface in which to handle messages, or null.
+ * &lt;span class=&quot;doctag&quot;&gt;@param&lt;/span&gt; async If true, the handler calls {&lt;span class=&quot;doctag&quot;&gt;@link&lt;/span&gt; Message#setAsynchronous(boolean)} for
+ * each {&lt;span class=&quot;doctag&quot;&gt;@link&lt;/span&gt; Message} that is sent to it or {&lt;span class=&quot;doctag&quot;&gt;@link&lt;/span&gt; Runnable} that is posted to it.
+ *
+ * &lt;span class=&quot;doctag&quot;&gt;@hide&lt;/span&gt;
+ */&lt;/span&gt;
+&lt;span class=&quot;function&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;title&quot;&gt;Handler&lt;/span&gt;&lt;span class=&quot;params&quot;&gt;(Callback callback, &lt;span class=&quot;keyword&quot;&gt;boolean&lt;/span&gt; async)&lt;/span&gt; &lt;/span&gt;{
+    &lt;span class=&quot;keyword&quot;&gt;if&lt;/span&gt; (FIND_POTENTIAL_LEAKS) {
+        &lt;span class=&quot;keyword&quot;&gt;final&lt;/span&gt; Class&amp;lt;? extends Handler&amp;gt; klass = getClass();
+        &lt;span class=&quot;keyword&quot;&gt;if&lt;/span&gt; ((klass.isAnonymousClass() || klass.isMemberClass() || klass.isLocalClass()) &amp;amp;&amp;amp;
+                (klass.getModifiers() &amp;amp; Modifier.STATIC) == &lt;span class=&quot;number&quot;&gt;0&lt;/span&gt;) {
+            Log.w(TAG, &lt;span class=&quot;string&quot;&gt;&quot;The following Handler class should be static or leaks might occur: &quot;&lt;/span&gt; +
+                klass.getCanonicalName());
+        }
+    }
+
+    mLooper = Looper.myLooper();     &lt;span class=&quot;comment&quot;&gt;//获取当前线程的looper对象&lt;/span&gt;
+    &lt;span class=&quot;keyword&quot;&gt;if&lt;/span&gt; (mLooper == &lt;span class=&quot;keyword&quot;&gt;null&lt;/span&gt;) {        &lt;span class=&quot;comment&quot;&gt;//如果当前线程没有looper对象就会报错&lt;/span&gt;
+        &lt;span class=&quot;keyword&quot;&gt;throw&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;new&lt;/span&gt; RuntimeException(
+            &lt;span class=&quot;string&quot;&gt;&quot;Can&#39;t create handler inside thread that has not called Looper.prepare()&quot;&lt;/span&gt;);
+    }
+    mQueue = mLooper.mQueue;    &lt;span class=&quot;comment&quot;&gt;//持有当前looper对象的MessageQueue&lt;/span&gt;
+    mCallback = callback;
+    mAsynchronous = async;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;调用具体的构造函数就是获取 mLooper的Looper对象 和 mQueue的MessageQueue消息队列作为自己的成员变量持有。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;总结：创建Hanndler的时候就绑定了指定线程的Looper和MessageQueue。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h3 id=&quot;3-Looper-loop&quot;&gt;&lt;a href=&quot;#3-Looper-loop&quot; class=&quot;headerlink&quot; title=&quot;3.Looper.loop();&quot;&gt;&lt;/a&gt;3.Looper.loop();&lt;/h3&gt;&lt;pre&gt;&lt;code class=&quot;java&quot;&gt;&lt;span class=&quot;comment&quot;&gt;/**
+ * Run the message queue in this thread. Be sure to call
+ * {&lt;span class=&quot;doctag&quot;&gt;@link&lt;/span&gt; #quit()} to end the loop.
+ */&lt;/span&gt;
+&lt;span class=&quot;function&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;static&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;title&quot;&gt;loop&lt;/span&gt;&lt;span class=&quot;params&quot;&gt;()&lt;/span&gt; &lt;/span&gt;{
+    &lt;span class=&quot;keyword&quot;&gt;final&lt;/span&gt; Looper me = myLooper();
+    &lt;span class=&quot;keyword&quot;&gt;if&lt;/span&gt; (me == &lt;span class=&quot;keyword&quot;&gt;null&lt;/span&gt;) {
+        &lt;span class=&quot;keyword&quot;&gt;throw&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;new&lt;/span&gt; RuntimeException(&lt;span class=&quot;string&quot;&gt;&quot;No Looper; Looper.prepare() wasn&#39;t called on this thread.&quot;&lt;/span&gt;);
+    }
+    &lt;span class=&quot;keyword&quot;&gt;final&lt;/span&gt; MessageQueue queue = me.mQueue;
+
+    &lt;span class=&quot;comment&quot;&gt;// Make sure the identity of this thread is that of the local process,&lt;/span&gt;
+    &lt;span class=&quot;comment&quot;&gt;// and keep track of what that identity token actually is.&lt;/span&gt;
+    Binder.clearCallingIdentity();
+    &lt;span class=&quot;keyword&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;long&lt;/span&gt; ident = Binder.clearCallingIdentity();
+
+    &lt;span class=&quot;keyword&quot;&gt;for&lt;/span&gt; (;;) {
+        Message msg = queue.next(); &lt;span class=&quot;comment&quot;&gt;// might block&lt;/span&gt;
+        &lt;span class=&quot;keyword&quot;&gt;if&lt;/span&gt; (msg == &lt;span class=&quot;keyword&quot;&gt;null&lt;/span&gt;) {
+            &lt;span class=&quot;comment&quot;&gt;// No message indicates that the message queue is quitting.&lt;/span&gt;
+            &lt;span class=&quot;keyword&quot;&gt;return&lt;/span&gt;;
+        }
+
+        &lt;span class=&quot;comment&quot;&gt;// This must be in a local variable, in case a UI event sets the logger&lt;/span&gt;
+        Printer logging = me.mLogging;
+        &lt;span class=&quot;keyword&quot;&gt;if&lt;/span&gt; (logging != &lt;span class=&quot;keyword&quot;&gt;null&lt;/span&gt;) {
+            logging.println(&lt;span class=&quot;string&quot;&gt;&quot;&amp;gt;&amp;gt;&amp;gt;&amp;gt;&amp;gt; Dispatching to &quot;&lt;/span&gt; + msg.target + &lt;span class=&quot;string&quot;&gt;&quot; &quot;&lt;/span&gt; +
+                    msg.callback + &lt;span class=&quot;string&quot;&gt;&quot;: &quot;&lt;/span&gt; + msg.what);
+        }
+
+        msg.target.dispatchMessage(msg);
+
+        &lt;span class=&quot;keyword&quot;&gt;if&lt;/span&gt; (logging != &lt;span class=&quot;keyword&quot;&gt;null&lt;/span&gt;) {
+            logging.println(&lt;span class=&quot;string&quot;&gt;&quot;&amp;lt;&amp;lt;&amp;lt;&amp;lt;&amp;lt; Finished to &quot;&lt;/span&gt; + msg.target + &lt;span class=&quot;string&quot;&gt;&quot; &quot;&lt;/span&gt; + msg.callback);
+        }
+
+        &lt;span class=&quot;comment&quot;&gt;// Make sure that during the course of dispatching the&lt;/span&gt;
+        &lt;span class=&quot;comment&quot;&gt;// identity of the thread wasn&#39;t corrupted.&lt;/span&gt;
+        &lt;span class=&quot;keyword&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;long&lt;/span&gt; newIdent = Binder.clearCallingIdentity();
+        &lt;span class=&quot;keyword&quot;&gt;if&lt;/span&gt; (ident != newIdent) {
+            Log.wtf(TAG, &lt;span class=&quot;string&quot;&gt;&quot;Thread identity changed from 0x&quot;&lt;/span&gt;
+                    + Long.toHexString(ident) + &lt;span class=&quot;string&quot;&gt;&quot; to 0x&quot;&lt;/span&gt;
+                    + Long.toHexString(newIdent) + &lt;span class=&quot;string&quot;&gt;&quot; while dispatching to &quot;&lt;/span&gt;
+                    + msg.target.getClass().getName() + &lt;span class=&quot;string&quot;&gt;&quot; &quot;&lt;/span&gt;
+                    + msg.callback + &lt;span class=&quot;string&quot;&gt;&quot; what=&quot;&lt;/span&gt; + msg.what);
+        }
+
+        msg.recycleUnchecked();
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;运行当前线程的消息队列，让其MessageQueue循环，获取MessageQueue消息队列的Message，然后将其分发出去&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;总结：Looper.loop方法是在子线程中创建绑定Looper和MessageQueue，然后让Looper循环的获取MessageQueue里面的Message来进行分发的。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;综上，我们如果要用到Looper线程的话，只要像Looper.java文档片段那样创建自己的Looper线程就行了。然后用在线程中创建的Handler发送消息。&lt;/p&gt;
+&lt;h2 id=&quot;后记&quot;&gt;&lt;a href=&quot;#后记&quot; class=&quot;headerlink&quot; title=&quot;后记&quot;&gt;&lt;/a&gt;后记&lt;/h2&gt;&lt;p&gt;以前的开发中总是用到Handler，Message来实现异步，主要是用于避免在UI线程(主线程)中使用费时的操作,比如网络，操作数据库，读写文件等等操作。从而会引起ANR（Android Not Response）。&lt;/p&gt;
+&lt;p&gt;在Android开发中，我们使用Handler、Message来实现异步编程的一般步骤：&lt;/p&gt;
+&lt;h3 id=&quot;1-主线程中声明Handler&quot;&gt;&lt;a href=&quot;#1-主线程中声明Handler&quot; class=&quot;headerlink&quot; title=&quot;1.主线程中声明Handler&quot;&gt;&lt;/a&gt;1.主线程中声明Handler&lt;/h3&gt;&lt;pre&gt;&lt;code class=&quot;java&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;private&lt;/span&gt; Handler mHandler = &lt;span class=&quot;keyword&quot;&gt;new&lt;/span&gt; Handler(){
+  &lt;span class=&quot;function&quot;&gt;&lt;span class=&quot;keyword&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;keyword&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;title&quot;&gt;handleMessage&lt;/span&gt;&lt;span class=&quot;params&quot;&gt;(Message msg)&lt;/span&gt; &lt;/span&gt;{
+      &lt;span class=&quot;comment&quot;&gt;// process incoming messages here&lt;/span&gt;
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id=&quot;2-子线程想要获取得到的obj使用Message发送给主线程的Handler&quot;&gt;&lt;a href=&quot;#2-子线程想要获取得到的obj使用Message发送给主线程的Handler&quot; class=&quot;headerlink&quot; title=&quot;2.子线程想要获取得到的obj使用Message发送给主线程的Handler&quot;&gt;&lt;/a&gt;2.子线程想要获取得到的obj使用Message发送给主线程的Handler&lt;/h3&gt;&lt;pre&gt;&lt;code class=&quot;java&quot;&gt;Message msg = &lt;span class=&quot;keyword&quot;&gt;new&lt;/span&gt; Message();
+msg.what = what;
+msg.obj = obj;
+...
+mHandler.sendMessage(msg);
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id=&quot;3-在handleMessage-Message-msg-方法中处理子线程发送过来的msg-obj结果&quot;&gt;&lt;a href=&quot;#3-在handleMessage-Message-msg-方法中处理子线程发送过来的msg-obj结果&quot; class=&quot;headerlink&quot; title=&quot;3.在handleMessage(Message msg)方法中处理子线程发送过来的msg.obj结果&quot;&gt;&lt;/a&gt;3.在handleMessage(Message msg)方法中处理子线程发送过来的msg.obj结果&lt;/h3&gt;&lt;p&gt;通过上面的分析，我们终于知道mHandler是如何处理消息的? 有兴趣可以结合上面的步骤去跟踪源码多读几遍就能理解了。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;读完上面，可以消除以下疑问：&lt;/p&gt;
+&lt;h4 id=&quot;1-Handler、Message是如何处理异步消息的？&quot;&gt;&lt;a href=&quot;#1-Handler、Message是如何处理异步消息的？&quot; class=&quot;headerlink&quot; title=&quot;1.Handler、Message是如何处理异步消息的？&quot;&gt;&lt;/a&gt;1.Handler、Message是如何处理异步消息的？&lt;/h4&gt;&lt;h4 id=&quot;2-如何创建Looper线程？&quot;&gt;&lt;a href=&quot;#2-如何创建Looper线程？&quot; class=&quot;headerlink&quot; title=&quot;2.如何创建Looper线程？&quot;&gt;&lt;/a&gt;2.如何创建Looper线程？&lt;/h4&gt;&lt;h4 id=&quot;3-Handler、Message、MessageQueue、Looper之间四者是怎么样的关系？&quot;&gt;&lt;a href=&quot;#3-Handler、Message、MessageQueue、Looper之间四者是怎么样的关系？&quot; class=&quot;headerlink&quot; title=&quot;3.Handler、Message、MessageQueue、Looper之间四者是怎么样的关系？&quot;&gt;&lt;/a&gt;3.Handler、Message、MessageQueue、Looper之间四者是怎么样的关系？&lt;/h4&gt;&lt;/blockquote&gt;
+</content>
+    
+    <summary type="html">
+    
+      &lt;h2 id=&quot;前言&quot;&gt;&lt;a href=&quot;#前言&quot; class=&quot;headerlink&quot; title=&quot;前言&quot;&gt;&lt;/a&gt;前言&lt;/h2&gt;&lt;p&gt;在Android的实际开发当中，刚开始很多时候都是用Handler、Message来实现异步的。&lt;br&gt;Handler、Message、Me
+    
+    </summary>
+    
+    
+  </entry>
+  
+</feed>
